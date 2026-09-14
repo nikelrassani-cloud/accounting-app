@@ -5,7 +5,6 @@ from datetime import date
 
 st.set_page_config(page_title="MiniBooks", page_icon="📊", layout="wide")
 
-# ---------- DATABASE ----------
 con = sqlite3.connect("minibooks.db", check_same_thread=False)
 con.execute("""CREATE TABLE IF NOT EXISTS accounts(
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -22,7 +21,6 @@ con.execute("""CREATE TABLE IF NOT EXISTS journal(
     credit REAL NOT NULL DEFAULT 0)""")
 con.commit()
 
-# Default chart of accounts (added once)
 DEFAULT_ACCOUNTS = [
     ("1000", "Cash", "ASSET"),
     ("1010", "Bank", "ASSET"),
@@ -43,7 +41,6 @@ if con.execute("SELECT COUNT(*) FROM accounts").fetchone()[0] == 0:
 acc_df = pd.read_sql("SELECT code, name FROM accounts ORDER BY code", con)
 acc_options = [f"{r.code}  {r.name}" for _, r in acc_df.iterrows()]
 
-# ---------- PAGES ----------
 page = st.sidebar.radio("Menu", ["Dashboard", "New Entry", "Trial Balance", "Chart of Accounts"])
 
 if page == "Dashboard":
@@ -72,14 +69,14 @@ elif page == "New Entry":
         c_amt = st.number_input("Credit amount", min_value=0.0, step=0.01)
         if st.form_submit_button("Post Entry"):
             if d_amt <= 0 or abs(d_amt - c_amt) > 0.001:
-                st.error("❌ Debit must EQUAL Credit (and be greater than 0)")
+                st.error("❌ Debit aur Credit barabar hone chahiye!")
             else:
-                con.execute("INSERT INTO journal(entry_date,description,account_code,debit,credit) VALUES(?,?,?,?,?,?)",
+                con.execute("INSERT INTO journal(entry_date,description,account_code,debit,credit) VALUES(?,?,?,?,?)",
                             (str(entry_date), desc, d_acc.split(" ")[0], d_amt, 0))
-                con.execute("INSERT INTO journal(entry_date,description,account_code,debit,credit) VALUES(?,?,?,?,?,?)",
+                con.execute("INSERT INTO journal(entry_date,description,account_code,debit,credit) VALUES(?,?,?,?,?)",
                             (str(entry_date), desc, c_acc.split(" ")[0], 0, c_amt))
                 con.commit()
-                st.success("✅ Entry posted!")
+                st.success("✅ Entry post ho gayi!")
 
 elif page == "Trial Balance":
     st.title("⚖️ Trial Balance")
@@ -88,33 +85,32 @@ elif page == "Trial Balance":
                         FROM journal j JOIN accounts a ON a.code=j.account_code
                         GROUP BY j.account_code, a.name, a.type ORDER BY j.account_code""", con)
     if df.empty:
-        st.info("No entries yet — post one from the menu!")
+        st.info("Abhi koi entry nahi — pehle New Entry banayein!")
     else:
         df["Balance"] = df.Debit - df.Credit
-        totals = pd.DataFrame([{"Code":"", "Account":"TOTAL", "Type":"",
-                                "Debit":df.Debit.sum(), "Credit":df.Credit.sum(),
+        totals = pd.DataFrame([{"Code":"","Account":"TOTAL","Type":"",
+                                "Debit":df.Debit.sum(),"Credit":df.Credit.sum(),
                                 "Balance":df.Balance.sum()}])
         st.dataframe(pd.concat([df, totals], ignore_index=True), use_container_width=True)
         if abs(df.Debit.sum() - df.Credit.sum()) < 0.01:
-            st.success(f"✅ Balanced! Debits = Credits = {df.Debit.sum():,.2f}")
+            st.success(f"✅ Balanced! {df.Debit.sum():,.2f}")
         else:
-            st.error("❌ Out of balance — check your entries")
+            st.error("❌ Balance nahi hai")
 
 elif page == "Chart of Accounts":
     st.title("📒 Chart of Accounts")
     st.dataframe(acc_df.rename(columns={"code":"Code","name":"Account"}), use_container_width=True)
     with st.form("add_acc"):
-        st.subheader("Add new account")
+        st.subheader("Naya account add karein")
         c1, c2, c3 = st.columns(3)
-        code = c1.text_input("Code (e.g. 6200)")
-        name = c2.text_input("Account name")
+        code = c1.text_input("Code (maslan 6200)")
+        name = c2.text_input("Account ka naam")
         typ = c3.selectbox("Type", ["ASSET","LIABILITY","EQUITY","INCOME","EXPENSE"])
         if st.form_submit_button("Add"):
             try:
                 con.execute("INSERT INTO accounts(code,name,type) VALUES(?,?,?)", (code, name, typ))
                 con.commit()
-                st.success(f"Added {code} {name}")
+                st.success(f"{code} {name} add ho gaya")
                 st.rerun()
             except Exception as e:
-                st.error(f"Could not add: {e}")
-                
+                st.error(f"Add nahi hua: {e}")
